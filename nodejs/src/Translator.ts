@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { promisify } from "util";
 import Language from "./Language";
+import { getPWD } from "./Utils";
 
 export default class Translator {
 	public static addLang(code: string, file: string) {
@@ -51,7 +52,7 @@ exports.default = Translator`;
 		return Translator._langs;
 	}
 	public static get filePath() {
-		return path.resolve("..", "..", "assets", "js", "Translator.js");
+		return path.resolve(getPWD(), "..", "assets", "js", "Translator.js");
 	}
 	private static _langs: Language[] = [];
 }

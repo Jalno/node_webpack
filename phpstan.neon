@@ -1,0 +1,7 @@
+parameters:
+  level: max
+  paths:
+    - processes
+    - listeners
+  scanDirectories:
+    - vendor/jalno/base

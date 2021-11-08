@@ -1,6 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 class LessLoaderHelper {
+    source;
+    target;
     constructor(source, target) {
         this.source = source;
         this.target = target;

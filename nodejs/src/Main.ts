@@ -2,6 +2,7 @@ import * as child_process from "child_process";
 import * as crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";
+import { exit } from "process";
 import { promisify } from "util";
 import * as webpackTypes from "webpack";
 import Front from "./Front";
@@ -11,6 +12,7 @@ import Language from "./Language";
 import LessLoaderHelper from "./LessLoaderHelper";
 import Package from "./Package";
 import Translator from "./Translator";
+import { getJalnoIndexDir, getJalnoPath, getPackagesDir, getPWD, isComposerPackage } from "./Utils";
 
 export interface IEntries {
 	[key: string]: string[];
@@ -67,7 +69,7 @@ export default class Main {
 		if (!Main.tsconfig) {
 			Main.tsconfig = path.resolve("tsconfig.json");
 		}
-		process.chdir(__dirname);
+        process.chdir(__dirname);
 		Main.jalnoOptions = await JalnoOptions.load();
 		await Main.initDependencies();
 		const packages = await Main.initPackages();
@@ -223,15 +225,45 @@ Options:
 	--production			Change webpack mode to production [default is development]`);
 	}
 	private static async initPackages(): Promise<Package[]> {
-		const packagesPath = path.resolve("..", "..", "..");
-		const files = await promisify(fs.readdir)(packagesPath, {
-			withFileTypes: true,
-		});
 		const packages = [];
-		for (const file of files) {
-			const packagepath = path.resolve(packagesPath , file.name);
-			if (file.isDirectory() && await promisify(fs.exists)(packagepath + "/package.json")) {
-				packages.push(new Package(packagesPath, file.name));
+		const access = promisify(fs.access);
+		const packagesPath = getPackagesDir();
+		const addPackageDir = async (packagePath: string) => {
+			try {
+				await access(path.join(packagePath, "package.json"));
+				packages.push(new Package(path.dirname(packagePath), path.basename(packagePath)));
+			} catch(e) {}
+		};
+		if (isComposerPackage()) {
+			await addPackageDir(getJalnoPath());
+			const vendors = await promisify(fs.readdir)(packagesPath, {
+				withFileTypes: true,
+			});
+			for (const vendor of vendors) {
+				if (!vendor.isDirectory()) {
+					continue;
+				}
+				const vendorPath = path.join(packagesPath, vendor.name);
+				const files = await promisify(fs.readdir)(vendorPath, {
+					withFileTypes: true,
+				});
+				for (const file of files) {
+					if (file.isFile()) {
+						continue;
+					}
+					await addPackageDir(path.join(vendorPath, file.name));
+				}
+
+			}
+		} else {
+			const files = await promisify(fs.readdir)(packagesPath, {
+				withFileTypes: true,
+			});
+			for (const file of files) {
+				if (file.isFile()) {
+					continue;
+				}
+				await addPackageDir(path.join(packagesPath, file.name));
 			}
 		}
 		return packages;
@@ -278,7 +310,7 @@ Options:
 		const TerserPlugin = require("terser-webpack-plugin");
 		const precss = require("precss");
 		const autoprefixer = require("autoprefixer");
-		const outputPath = path.resolve("..", "..", "storage", "public", "frontend", "dist");
+		const outputPath = path.resolve(getPWD(), "..", "storage", "public", "frontend", "dist");
 		let compiler: webpackTypes.Compiler;
 		try {
 			compiler = webpack({
@@ -408,10 +440,7 @@ Options:
 			profile: false,
 		}).apply(compiler);
 		const exists = promisify(fs.exists);
-		const read = promisify(fs.readFile);
-		const resultpath = path.resolve("..", "result.json");
-		const basePath = path.resolve("..", "..", "..", "..");
-		const offset = (basePath + "/").length;
+		const basePath = getJalnoIndexDir();
 		const resultEntries: IEntries = {};
 		for (const name in entries) {
 			if (entries[name] !== undefined) {
@@ -419,7 +448,7 @@ Options:
 					if (resultEntries[name] === undefined) {
 						resultEntries[name] = [];
 					}
-					resultEntries[name].push(entry.substr(offset));
+					resultEntries[name].push(path.relative(basePath, entry));
 				}
 			}
 		}
@@ -427,15 +456,10 @@ Options:
 			if (err) {
 				throw err;
 			}
-			let result: any = {};
-			if (await exists(resultpath)) {
-				result = JSON.parse(await read(resultpath, "UTF8"));
-			} else {
-				result = {
-					outputedFiles: {},
-				};
-			}
-			result.handledFiles = resultEntries;
+			let result = {
+				outputedFiles: {},
+				handledFiles: resultEntries,
+			};
 			const promises = [];
 			for (const chunk of stats.compilation.chunks) {
 				for (const file of chunk.files) {
@@ -444,12 +468,12 @@ Options:
 						console.error(`\u001b[1m\u001b[31mOutput file '${file}' does not exists on '${filePath}'\u001b[39m\u001b[22m`);
 						process.exit(1);
 					}
-					const relativePath = filePath.substr(offset);
+					const relativePath = path.relative(basePath, filePath);
 					if (result.outputedFiles[chunk.name] === undefined) {
 						result.outputedFiles[chunk.name] = [];
 					}
 					if (Main.mode === "production") {
-						const promise = new Promise((resolve, reject) => {
+						const promise = new Promise<void>((resolve, reject) => {
 							const hash = crypto.createHash("sha256");
 							const stream = fs.createReadStream(filePath, {
 								encoding: "UTF8",
@@ -496,7 +520,7 @@ Options:
 			if (promises.length) {
 				await Promise.all(promises);
 			}
-			await promisify(fs.writeFile)(path.resolve("..", "result.json"), JSON.stringify(result, null, 2), "UTF8");
+			await promisify(fs.writeFile)(path.resolve(__dirname, "..", "result.json"), JSON.stringify(result, null, 2), "UTF8");
 			if (Main.writeWebpackConfig) {
 				await Main.updateJalnoMoudles(Main.JalnoResolver.getModules());
 			}

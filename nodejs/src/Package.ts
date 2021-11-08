@@ -10,10 +10,10 @@ export default class Package {
 	}
 	private _path: string;
 	public constructor(private _dir: string, private _name: string) {
-		this._path = this._dir + "/" + this._name;
+		this._path = path.join(this._dir, this._name);
 	}
 	public async getFrontends(): Promise<Front[]> {
-		const packagejson = this._path + "/" + "package.json";
+		const packagejson = path.join(this._path, "package.json");
 		const data = await promisify(fs.readFile)(packagejson, "utf8");
 		const file = JSON.parse(data);
 		if (! file.hasOwnProperty("frontend")) {

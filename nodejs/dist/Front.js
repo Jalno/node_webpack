@@ -7,14 +7,17 @@ const Language_1 = require("./Language");
 const Module_1 = require("./Module");
 const Package_1 = require("./Package");
 class Front {
+    _package;
+    _name;
+    static unserialize(data) {
+        return new Front(Package_1.default.unserialize(data._package), data._name);
+    }
+    _path;
+    entriesTypes = ["css", "less", "scss", "sass", "js", "ts", "tsx"];
     constructor(_package, _name) {
         this._package = _package;
         this._name = _name;
-        this.entriesTypes = ["css", "less", "scss", "sass", "js", "ts", "tsx"];
         this._path = _package.path + "/" + _name;
-    }
-    static unserialize(data) {
-        return new Front(Package_1.default.unserialize(data._package), data._name);
     }
     async initDependencies() {
         const theme = await this.getTheme();
@@ -23,8 +26,8 @@ class Front {
         }
         const packagejson = this._path + "/package.json";
         let packages = {};
-        if (await util_1.promisify(fs.exists)(packagejson)) {
-            packages = JSON.parse(await util_1.promisify(fs.readFile)(packagejson, "UTF8"));
+        if (await (0, util_1.promisify)(fs.exists)(packagejson)) {
+            packages = JSON.parse(await (0, util_1.promisify)(fs.readFile)(packagejson, "UTF8"));
         }
         if (!packages.hasOwnProperty("dependencies")) {
             packages.dependencies = {};
@@ -51,14 +54,14 @@ class Front {
             }
         }
         if (hasChange) {
-            await util_1.promisify(fs.writeFile)(packagejson, JSON.stringify(packages, null, 2), "utf8");
+            await (0, util_1.promisify)(fs.writeFile)(packagejson, JSON.stringify(packages, null, 2), "utf8");
         }
     }
     async getModules() {
         const node_modules = this._path + "/node_modules";
         const json = this._path + "/package.json";
-        const exists = util_1.promisify(fs.exists);
-        const readFile = util_1.promisify(fs.readFile);
+        const exists = (0, util_1.promisify)(fs.exists);
+        const readFile = (0, util_1.promisify)(fs.readFile);
         if (!await exists(node_modules) ||
             !await exists(json)) {
             return [];
@@ -99,23 +102,23 @@ class Front {
     }
     async getTheme() {
         const themeJson = this._path + "/theme.json";
-        if (!await util_1.promisify(fs.exists)(themeJson)) {
+        if (!await (0, util_1.promisify)(fs.exists)(themeJson)) {
             return;
         }
-        return JSON.parse(await util_1.promisify(fs.readFile)(themeJson, "UTF8"));
+        return JSON.parse(await (0, util_1.promisify)(fs.readFile)(themeJson, "UTF8"));
     }
     async clean(filePath = "") {
         if (!filePath) {
             filePath = path.resolve(this._path, "node_modules");
         }
-        if (!await util_1.promisify(fs.exists)(filePath)) {
+        if (!await (0, util_1.promisify)(fs.exists)(filePath)) {
             return;
         }
-        const unlink = util_1.promisify(fs.unlink);
-        if (!(await util_1.promisify(fs.lstat)(filePath)).isDirectory()) {
+        const unlink = (0, util_1.promisify)(fs.unlink);
+        if (!(await (0, util_1.promisify)(fs.lstat)(filePath)).isDirectory()) {
             return await unlink(filePath);
         }
-        const files = await util_1.promisify(fs.readdir)(filePath, {
+        const files = await (0, util_1.promisify)(fs.readdir)(filePath, {
             withFileTypes: true,
         });
         if (files.length > 0) {
@@ -131,7 +134,7 @@ class Front {
             }
             await Promise.all(promises);
         }
-        return util_1.promisify(fs.rmdir)(filePath);
+        return (0, util_1.promisify)(fs.rmdir)(filePath);
     }
     async getLangs() {
         const file = await this.getTheme();

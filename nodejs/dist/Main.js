@@ -9,6 +9,7 @@ const JalnoOptions_1 = require("./JalnoOptions");
 const LessLoaderHelper_1 = require("./LessLoaderHelper");
 const Package_1 = require("./Package");
 const Translator_1 = require("./Translator");
+const Utils_1 = require("./Utils");
 class Main {
     static async run() {
         if (process.argv.length > 2) {
@@ -103,13 +104,23 @@ class Main {
     }
     static async updateJalnoMoudles(modules) {
         const jalnoPath = path.resolve(__dirname, "..", "jalno.json");
-        if (!await util_1.promisify(fs.exists)(jalnoPath)) {
+        if (!await (0, util_1.promisify)(fs.exists)(jalnoPath)) {
             return;
         }
-        const jalno = JSON.parse(await util_1.promisify(fs.readFile)(jalnoPath, "UTF8"));
+        const jalno = JSON.parse(await (0, util_1.promisify)(fs.readFile)(jalnoPath, "UTF8"));
         jalno.modules = modules;
-        await util_1.promisify(fs.writeFile)(path.resolve("..", "jalno.json"), JSON.stringify(jalno, null, 2), "UTF8");
+        await (0, util_1.promisify)(fs.writeFile)(path.resolve("..", "jalno.json"), JSON.stringify(jalno, null, 2), "UTF8");
     }
+    static JalnoResolver;
+    static watch = false;
+    static skipInstall = false;
+    static writeWebpackConfig = false;
+    static skipWebpack = false;
+    static clean = false;
+    static mode = "development";
+    static jalnoOptions;
+    static args = [];
+    static tsconfig;
     static async checkArgs() {
         Main.args = [];
         for (let i = 2; i < process.argv.length; i++) {
@@ -156,7 +167,7 @@ class Main {
                         process.exit(1);
                     }
                     const tsconfigPath = path.resolve("..", "..", "..", ...arg[1].split("/"));
-                    if (!await util_1.promisify(fs.exists)(tsconfigPath)) {
+                    if (!await (0, util_1.promisify)(fs.exists)(tsconfigPath)) {
                         console.error(`\u001b[1m\u001b[31mError: Can not find any tsconfig file in ${tsconfigPath}\u001b[39m\u001b[22m`);
                         process.exit(1);
                     }
@@ -200,15 +211,46 @@ Options:
 	--production			Change webpack mode to production [default is development]`);
     }
     static async initPackages() {
-        const packagesPath = path.resolve("..", "..", "..");
-        const files = await util_1.promisify(fs.readdir)(packagesPath, {
-            withFileTypes: true,
-        });
         const packages = [];
-        for (const file of files) {
-            const packagepath = path.resolve(packagesPath, file.name);
-            if (file.isDirectory() && await util_1.promisify(fs.exists)(packagepath + "/package.json")) {
-                packages.push(new Package_1.default(packagesPath, file.name));
+        const access = (0, util_1.promisify)(fs.access);
+        const packagesPath = (0, Utils_1.getPackagesDir)();
+        const addPackageDir = async (packagePath) => {
+            try {
+                await access(path.join(packagePath, "package.json"));
+                packages.push(new Package_1.default(path.dirname(packagePath), path.basename(packagePath)));
+            }
+            catch (e) { }
+        };
+        if ((0, Utils_1.isComposerPackage)()) {
+            await addPackageDir((0, Utils_1.getJalnoPath)());
+            const vendors = await (0, util_1.promisify)(fs.readdir)(packagesPath, {
+                withFileTypes: true,
+            });
+            for (const vendor of vendors) {
+                if (!vendor.isDirectory()) {
+                    continue;
+                }
+                const vendorPath = path.join(packagesPath, vendor.name);
+                const files = await (0, util_1.promisify)(fs.readdir)(vendorPath, {
+                    withFileTypes: true,
+                });
+                for (const file of files) {
+                    if (file.isFile()) {
+                        continue;
+                    }
+                    await addPackageDir(path.join(vendorPath, file.name));
+                }
+            }
+        }
+        else {
+            const files = await (0, util_1.promisify)(fs.readdir)(packagesPath, {
+                withFileTypes: true,
+            });
+            for (const file of files) {
+                if (file.isFile()) {
+                    continue;
+                }
+                await addPackageDir(path.join(packagesPath, file.name));
             }
         }
         return packages;
@@ -218,8 +260,9 @@ Options:
             return;
         }
         try {
-            await util_1.promisify(child_process.exec)("npm root -g");
-        } catch (e) {
+            await (0, util_1.promisify)(child_process.exec)("npm root -g");
+        }
+        catch (e) {
             throw new Error("Cannot find npm on this environment");
         }
         await Main.installDependencies();
@@ -229,7 +272,6 @@ Options:
             return;
         }
         where = where || path.resolve(__dirname, "../");
-
         return new Promise((resolve, reject) => {
             console.log(`check ${where}/package.json is exists?`);
             if (!fs.existsSync(`${where}/package.json`)) {
@@ -239,10 +281,11 @@ Options:
             console.log(`run npm install on ${where}`);
             const npm = child_process.spawn("npm", ["install"], { cwd: where, stdio: 'inherit' });
             npm.on("close", (code) => {
-                console.log("\n\n"); // This make webpack output visible
+                console.log("\n\n");
                 if (code == 0) {
                     resolve();
-                } else {
+                }
+                else {
                     reject();
                 }
             });
@@ -255,7 +298,7 @@ Options:
         const TerserPlugin = require("terser-webpack-plugin");
         const precss = require("precss");
         const autoprefixer = require("autoprefixer");
-        const outputPath = path.resolve("..", "..", "storage", "public", "frontend", "dist");
+        const outputPath = path.resolve((0, Utils_1.getPWD)(), "..", "storage", "public", "frontend", "dist");
         let compiler;
         try {
             compiler = webpack({
@@ -384,11 +427,8 @@ Options:
         new webpack.ProgressPlugin({
             profile: false,
         }).apply(compiler);
-        const exists = util_1.promisify(fs.exists);
-        const read = util_1.promisify(fs.readFile);
-        const resultpath = path.resolve("..", "result.json");
-        const basePath = path.resolve("..", "..", "..", "..");
-        const offset = (basePath + "/").length;
+        const exists = (0, util_1.promisify)(fs.exists);
+        const basePath = (0, Utils_1.getJalnoIndexDir)();
         const resultEntries = {};
         for (const name in entries) {
             if (entries[name] !== undefined) {
@@ -396,7 +436,7 @@ Options:
                     if (resultEntries[name] === undefined) {
                         resultEntries[name] = [];
                     }
-                    resultEntries[name].push(entry.substr(offset));
+                    resultEntries[name].push(path.relative(basePath, entry));
                 }
             }
         }
@@ -404,16 +444,10 @@ Options:
             if (err) {
                 throw err;
             }
-            let result = {};
-            if (await exists(resultpath)) {
-                result = JSON.parse(await read(resultpath, "UTF8"));
-            }
-            else {
-                result = {
-                    outputedFiles: {},
-                };
-            }
-            result.handledFiles = resultEntries;
+            let result = {
+                outputedFiles: {},
+                handledFiles: resultEntries,
+            };
             const promises = [];
             for (const chunk of stats.compilation.chunks) {
                 for (const file of chunk.files) {
@@ -422,7 +456,7 @@ Options:
                         console.error(`\u001b[1m\u001b[31mOutput file '${file}' does not exists on '${filePath}'\u001b[39m\u001b[22m`);
                         process.exit(1);
                     }
-                    const relativePath = filePath.substr(offset);
+                    const relativePath = path.relative(basePath, filePath);
                     if (result.outputedFiles[chunk.name] === undefined) {
                         result.outputedFiles[chunk.name] = [];
                     }
@@ -475,7 +509,7 @@ Options:
             if (promises.length) {
                 await Promise.all(promises);
             }
-            await util_1.promisify(fs.writeFile)(path.resolve("..", "result.json"), JSON.stringify(result, null, 2), "UTF8");
+            await (0, util_1.promisify)(fs.writeFile)(path.resolve(__dirname, "..", "result.json"), JSON.stringify(result, null, 2), "UTF8");
             if (Main.writeWebpackConfig) {
                 await Main.updateJalnoMoudles(Main.JalnoResolver.getModules());
             }
@@ -515,7 +549,7 @@ Options:
         return entries;
     }
     static async exportWebpackConfig(fronts, modules, entries) {
-        await util_1.promisify(fs.writeFile)(path.resolve("..", "jalno.json"), JSON.stringify({
+        await (0, util_1.promisify)(fs.writeFile)(path.resolve("..", "jalno.json"), JSON.stringify({
             mode: Main.mode,
             fronts: fronts,
             entries: entries,
@@ -666,14 +700,7 @@ module.exports = {
 		}),
 	],
 };`;
-        await util_1.promisify(fs.writeFile)(path.resolve("..", "webpack.config.js"), config, "UTF8");
+        await (0, util_1.promisify)(fs.writeFile)(path.resolve("..", "webpack.config.js"), config, "UTF8");
     }
 }
 exports.default = Main;
-Main.watch = false;
-Main.skipInstall = false;
-Main.writeWebpackConfig = false;
-Main.skipWebpack = false;
-Main.clean = false;
-Main.mode = "development";
-Main.args = [];

@@ -1,8 +1,8 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-const child_process = require("child_process");
-const Utils_1 = require("./Utils");
-class JalnoOptions {
+import * as child_process from "child_process";
+import * as path from "path";
+export default class JalnoOptions {
+    constructor() {
+    }
     static load(options) {
         if (options === undefined) {
             options = {};
@@ -13,20 +13,17 @@ class JalnoOptions {
         return new Promise((resolve, reject) => {
             const jalnoOptions = new JalnoOptions();
             const jalno = child_process.exec(`${options.php} index.php --process=packages/node_webpack/processes/GetJalnoOptions@getAvailableLangs`, {
-                cwd: (0, Utils_1.getJalnoIndexDir)(),
+                cwd: path.resolve(__dirname, "..", "..", "..", "..", "..", "public"),
             });
             jalno.stdout.on("data", (data) => {
+                console.log(data);
+                process.exit();
                 try {
                     jalnoOptions.availableLangs = JSON.parse(data);
                 }
                 catch (e) { }
                 resolve(jalnoOptions);
             });
-            jalno.on("error", reject);
         });
     }
-    availableLangs;
-    constructor() {
-    }
 }
-exports.default = JalnoOptions;

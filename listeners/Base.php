@@ -1,7 +1,7 @@
 <?php
 namespace packages\node_webpack\listeners;
 
-use packages\base\{packages, json, IO\file, IO\directory, frontend\theme, view\events\beforeLoad};
+use packages\base\{Packages, json, IO\file, IO\directory, frontend\theme, view\events\beforeLoad};
 use packages\criticalcss\listeners\MVC as CriticalCSS;
 class Base {
 	public function beforeLoadView(beforeLoad $event) {
@@ -81,7 +81,7 @@ class Base {
 		return array_merge($commonAssets, $filteredAssets);
 	}
 	private function getWebpackResult(): array {
-		$nodejs = new directory\local(packages::package("node_webpack")->getFilePath("nodejs"));
+		$nodejs = Packages::package("node_webpack")->getHome()->directory("nodejs");
 		$result = array();
 		$resultFile = $nodejs->file("result.json");
 		if ($resultFile->exists()) {

@@ -6,17 +6,20 @@ const util_1 = require("util");
 const Front_1 = require("./Front");
 const Language_1 = require("./Language");
 class Package {
-    constructor(_dir, _name) {
-        this._dir = _dir;
-        this._name = _name;
-        this._path = this._dir + "/" + this._name;
-    }
+    _dir;
+    _name;
     static unserialize(data) {
         return new Package(data._dir, data._name);
     }
+    _path;
+    constructor(_dir, _name) {
+        this._dir = _dir;
+        this._name = _name;
+        this._path = path.join(this._dir, this._name);
+    }
     async getFrontends() {
-        const packagejson = this._path + "/" + "package.json";
-        const data = await util_1.promisify(fs.readFile)(packagejson, "utf8");
+        const packagejson = path.join(this._path, "package.json");
+        const data = await (0, util_1.promisify)(fs.readFile)(packagejson, "utf8");
         const file = JSON.parse(data);
         if (!file.hasOwnProperty("frontend")) {
             return [];
@@ -32,7 +35,7 @@ class Package {
     }
     async getLangs() {
         const packagejson = this._path + "/" + "package.json";
-        const data = await util_1.promisify(fs.readFile)(packagejson, "utf8");
+        const data = await (0, util_1.promisify)(fs.readFile)(packagejson, "utf8");
         const file = JSON.parse(data);
         if (!file.hasOwnProperty("languages")) {
             return [];

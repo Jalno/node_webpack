@@ -1,2 +1,3 @@
-storage
-assets
+/storage
+/assets
+/vendor

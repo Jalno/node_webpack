@@ -6,10 +6,9 @@ const semver = require("semver");
 const util_1 = require("util");
 const Module_1 = require("./Module");
 class JalnoResolver {
-    constructor(source, target) {
-        this.source = source;
-        this.target = target;
-    }
+    source;
+    target;
+    static commonFiles = {};
     static async initSources(fronts) {
         JalnoResolver.fronts = fronts;
         const installedModules = {};
@@ -87,6 +86,8 @@ class JalnoResolver {
     static getModules() {
         return JalnoResolver.modules;
     }
+    static fronts = [];
+    static modules = {};
     static async lookingForPackage(name, basepath, packagePath) {
         const realpath = packagePath;
         const realPackageManager = await JalnoResolver.getPackage(packagePath);
@@ -96,9 +97,9 @@ class JalnoResolver {
                 front = item;
             }
         }
-		if (!front) {
-			return;
-		}
+        if (!front) {
+            return;
+        }
         let packageManager = realPackageManager;
         if (JalnoResolver.modules[name] !== undefined) {
             let modulePackageRegex;
@@ -108,7 +109,7 @@ class JalnoResolver {
                 }
             }
             else {
-                packageManager = await JalnoResolver.getPackage(path_1.resolve(front.path, "package.json"));
+                packageManager = await JalnoResolver.getPackage((0, path_1.resolve)(front.path, "package.json"));
                 if (packageManager && packageManager.hasOwnProperty("dependencies")) {
                     if (packageManager.dependencies[name] !== undefined) {
                         modulePackageRegex = packageManager.dependencies[name];
@@ -147,12 +148,12 @@ class JalnoResolver {
             let newPackageManager;
             let dir = realpath;
             while (dir !== "/") {
-                newPackageManager = await JalnoResolver.getPackage(path_1.resolve(dir, name, "package.json"));
+                newPackageManager = await JalnoResolver.getPackage((0, path_1.resolve)(dir, name, "package.json"));
                 if (newPackageManager) {
                     break;
                 }
                 else {
-                    dir = path_1.resolve(dir, "..");
+                    dir = (0, path_1.resolve)(dir, "..");
                 }
             }
             if (newPackageManager) {
@@ -185,10 +186,14 @@ class JalnoResolver {
         }
     }
     static async getPackage(path) {
-        if (await util_1.promisify(fs.exists)(path) &&
-            (await util_1.promisify(fs.lstat)(path)).isFile()) {
-            return JSON.parse(await util_1.promisify(fs.readFile)(path, "UTF8"));
+        if (await (0, util_1.promisify)(fs.exists)(path) &&
+            (await (0, util_1.promisify)(fs.lstat)(path)).isFile()) {
+            return JSON.parse(await (0, util_1.promisify)(fs.readFile)(path, "UTF8"));
         }
+    }
+    constructor(source, target) {
+        this.source = source;
+        this.target = target;
     }
     async apply(resolver) {
         const target = resolver.ensureHook(this.target);
@@ -210,12 +215,12 @@ class JalnoResolver {
                     request: request.request,
                 });
                 if (splash < 0) {
-                    newModule.request = path_1.resolve(asset.getPath(), asset.main);
+                    newModule.request = (0, path_1.resolve)(asset.getPath(), asset.main);
                 }
                 else {
-                    newModule.request = path_1.resolve(asset.getPath(), request.request.substr(splash + 1));
+                    newModule.request = (0, path_1.resolve)(asset.getPath(), request.request.substr(splash + 1));
                 }
-                const exists = util_1.promisify(fs.exists);
+                const exists = (0, util_1.promisify)(fs.exists);
                 const lastSplash = newModule.request.lastIndexOf("/");
                 if (lastSplash >= 0) {
                     const filename = newModule.request.substr(lastSplash + 1);
@@ -242,7 +247,7 @@ class JalnoResolver {
                             JalnoResolver.commonFiles[newModule.request].push(matches[1]);
                         }
                     }
-                    newModule.path = path_1.dirname(newModule.request);
+                    newModule.path = (0, path_1.dirname)(newModule.request);
                     resolver.doResolve(target, newModule, null, resolveContext, callback);
                 }
                 else {
@@ -255,7 +260,4 @@ class JalnoResolver {
         });
     }
 }
-JalnoResolver.commonFiles = {};
-JalnoResolver.fronts = [];
-JalnoResolver.modules = {};
 exports.default = JalnoResolver;
