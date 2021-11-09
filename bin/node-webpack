@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 
-SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+PRG="$BASH_SOURCE"
+progname=`basename "$BASH_SOURCE"`
 
-cd "$SCRIPT_DIR/../nodejs/"
+while [ -h "$PRG" ] ; do
+    ls=`ls -ld "$PRG"`
+    link=`expr "$ls" : '.*-> \(.*\)$'`
+    if expr "$link" : '/.*' > /dev/null; then
+        PRG="$link"
+    else
+        PRG=`dirname "$PRG"`"/$link"
+    fi
+done
+cd "$(dirname $PRG)/../nodejs/"
 npm start -- "$@"
